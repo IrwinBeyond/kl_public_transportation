@@ -1,0 +1,20 @@
+postgres:
+  connection_string: "${DATABASE_URL}"
+  pool_size: 4
+  auto_publish:
+    from_schemas: [public]
+    tables:
+      transit_routes:
+        schema: public
+        table: transit_routes
+        geometry_column: geom
+        geometry_type: LINESTRING
+        srid: 4326
+        id_column: id
+      transit_stops:
+        schema: public
+        table: transit_stops
+        geometry_column: geom
+        geometry_type: POINT
+        srid: 4326
+        id_column: stop_id

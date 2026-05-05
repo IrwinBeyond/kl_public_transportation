@@ -1,0 +1,28 @@
+services:
+  martin:
+    image: ghcr.io/maplibre/martin:1.8.2
+    pull_policy: always
+    container_name: martin-transit
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./martin/martin.yaml:/etc/martin/config.yaml:ro
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        envsubst '$$DATABASE_URL' < /etc/martin/config.yaml > /tmp/martin.yaml
+        exec /usr/local/bin/martin --config /tmp/martin.yaml --webui enable-for-all
+    stop_grace_period: 10s
+
+  web:
+    image: nginx:alpine
+    volumes:
+      - ./app:/usr/share/nginx/html/app/sig
+    pull_policy: build
+    container_name: transit-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8000}:80"
