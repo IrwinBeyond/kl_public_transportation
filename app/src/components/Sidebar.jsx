@@ -98,16 +98,18 @@ function Sidebar({
 function StatusBar({ status, busCount, lastUpdate }) {
   const labels = {
     idle: 'Real-time: paused',
-    online: 'Live data active',
+    online: 'Live: active',
+    empty: 'Live: no buses right now',
     offline: 'Real-time unavailable',
   };
+  const dotClass = status === 'online' ? 'online' : status === 'empty' ? 'warning' : status === 'offline' ? '' : 'warning';
   const timeStr = lastUpdate ? lastUpdate.toLocaleTimeString() : '';
   return (
     <div id="status-bar">
-      <div className={`status-dot ${status === 'online' ? 'online' : status === 'offline' ? '' : 'warning'}`} />
+      <div className={`status-dot ${dotClass}`} />
       <span id="status-text">{labels[status] || labels.idle}</span>
       {busCount > 0 && <span id="bus-count">{busCount} bus{busCount !== 1 ? 'es' : ''}</span>}
-      {status === 'online' && timeStr && <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{timeStr}</span>}
+      {timeStr && <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{timeStr}</span>}
     </div>
   );
 }

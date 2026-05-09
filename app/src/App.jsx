@@ -21,28 +21,28 @@ const AGENCY_LABELS = {
 };
 
 const LAYER_DEFS = [
-  { id: 'rail-lines', type: 'line', source: 'routes', sourceLayer: 'transit_routes',
+  { id: 'rail-lines', type: 'line', source: 'routes', 'source-layer': 'transit_routes',
     filter: ['==', ['get', 'agency'], 'rapid-rail'],
     paint: { 'line-color': ['coalesce', ['get', 'route_color'], '#e57200'], 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2, 12, 4, 18, 7], 'line-opacity': 0.85 },
     layout: { 'line-join': 'round', 'line-cap': 'round' } },
-  { id: 'bus-routes', type: 'line', source: 'routes', sourceLayer: 'transit_routes',
+  { id: 'bus-routes', type: 'line', source: 'routes', 'source-layer': 'transit_routes',
     filter: ['==', ['get', 'agency'], 'rapid-bus'],
     paint: { 'line-color': ['coalesce', ['get', 'route_color'], '#115740'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.5, 18, 3], 'line-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 14, 0.5, 18, 0.8] },
     layout: { 'line-join': 'round', 'line-cap': 'round' } },
-  { id: 'mrt-feeder-routes', type: 'line', source: 'routes', sourceLayer: 'transit_routes',
+  { id: 'mrt-feeder-routes', type: 'line', source: 'routes', 'source-layer': 'transit_routes',
     filter: ['==', ['get', 'agency'], 'rapid-mrt'],
     paint: { 'line-color': ['coalesce', ['get', 'route_color'], '#FFCD00'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.5, 18, 3], 'line-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 14, 0.5, 18, 0.8] },
     layout: { 'line-join': 'round', 'line-cap': 'round' } },
-  { id: 'rail-stops', type: 'circle', source: 'stops', sourceLayer: 'transit_stops',
+  { id: 'rail-stops', type: 'circle', source: 'stops', 'source-layer': 'transit_stops',
     filter: ['==', ['get', 'agency'], 'rapid-rail'],
     paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 5, 18, 9], 'circle-color': '#D50032', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' } },
-  { id: 'bus-stops', type: 'circle', source: 'stops', sourceLayer: 'transit_stops',
+  { id: 'bus-stops', type: 'circle', source: 'stops', 'source-layer': 'transit_stops',
     filter: ['==', ['get', 'agency'], 'rapid-bus'], minzoom: 13,
     paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 1.5, 16, 4, 18, 6], 'circle-color': '#2E8B57', 'circle-opacity': 0.6 } },
-  { id: 'mrt-feeder-stops', type: 'circle', source: 'stops', sourceLayer: 'transit_stops',
+  { id: 'mrt-feeder-stops', type: 'circle', source: 'stops', 'source-layer': 'transit_stops',
     filter: ['==', ['get', 'agency'], 'rapid-mrt'], minzoom: 13,
     paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 1.5, 16, 4, 18, 6], 'circle-color': '#DAA520', 'circle-opacity': 0.6 } },
-  { id: 'ktmb-stops', type: 'circle', source: 'stops', sourceLayer: 'transit_stops',
+  { id: 'ktmb-stops', type: 'circle', source: 'stops', 'source-layer': 'transit_stops',
     filter: ['==', ['get', 'agency'], 'ktmb'],
     paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 5, 18, 9], 'circle-color': '#1964B7', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' } },
 ];
@@ -93,7 +93,7 @@ function App() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         map?.flyTo({ center: [longitude, latitude], zoom: 14 });
-        setTimeout(() => findNearbyStops(map, latitude, longitude), 500);
+        setTimeout(() => findNearbyStops(map, latitude, longitude), 1500);
       },
       () => {},
       { enableHighAccuracy: true, timeout: 10000 }
@@ -102,12 +102,15 @@ function App() {
 
   function findNearbyStops(map, lat, lng) {
     if (!map) return;
-    const features = map.queryRenderedFeatures({ layers: ['rail-stops', 'bus-stops', 'mrt-feeder-stops', 'ktmb-stops'] });
-    const stops = features.map(f => {
-      const [flng, flat] = f.geometry.coordinates;
-      const dist = getDist(lat, lng, flat, flng);
-      return { ...f.properties, lon: flng, lat: flat, dist };
-    }).sort((a, b) => a.dist - b.dist).slice(0, 5);
+    const features = map.querySourceFeatures('stops', { sourceLayer: 'transit_stops' });
+    const stops = features
+      .map(f => {
+        const [flng, flat] = f.geometry.coordinates;
+        const dist = getDist(lat, lng, flat, flng);
+        return { ...f.properties, lon: flng, lat: flat, dist };
+      })
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 5);
     setNearbyStops(stops);
   }
 
@@ -120,30 +123,35 @@ function App() {
     const map = mapInstanceRef.current;
     if (!map) return;
     const q = query.toLowerCase();
-    const features = map.queryRenderedFeatures({ layers: ['rail-stops', 'bus-stops', 'mrt-feeder-stops', 'ktmb-stops'] });
+
+    // Search all loaded vector tiles (not just visible viewport)
+    const features = map.querySourceFeatures('stops', { sourceLayer: 'transit_stops' });
     const results = features
-      .filter(f => f.properties.stop_name?.toLowerCase().includes(q))
+      .filter(f => {
+        const name = f.properties?.stop_name;
+        return name && name.toLowerCase().includes(q);
+      })
       .slice(0, 8);
-    // Render results in the search-results div
+
     const el = document.getElementById('search-results');
-    if (el) {
-      el.innerHTML = '';
-      el.classList.add('show');
-      results.forEach(f => {
-        const div = document.createElement('div');
-        div.className = 'search-item';
-        div.innerHTML = `<span class="name">${f.properties.stop_name}</span><span class="meta">${AGENCY_LABELS[f.properties.agency] || ''}</span>`;
-        div.addEventListener('click', () => {
-          mapInstanceRef.current?.flyTo({ center: f.geometry.coordinates, zoom: 17 });
-          el.classList.remove('show');
-          document.getElementById('search-input').value = '';
-        });
-        el.appendChild(div);
-      });
-      if (results.length === 0) {
-        el.innerHTML = '<div class="search-item" style="text-align:center;color:var(--text-muted);">No results</div>';
-      }
+    if (!el) return;
+    el.innerHTML = '';
+    el.classList.add('show');
+    if (results.length === 0) {
+      el.innerHTML = '<div class="search-item" style="text-align:center;color:var(--text-muted);">No results in loaded area — zoom or pan first</div>';
+      return;
     }
+    results.forEach(f => {
+      const div = document.createElement('div');
+      div.className = 'search-item';
+      div.innerHTML = `<span class="name">${f.properties.stop_name}</span><span class="meta">${AGENCY_LABELS[f.properties.agency] || ''}</span>`;
+      div.addEventListener('click', () => {
+        mapInstanceRef.current?.flyTo({ center: f.geometry.coordinates, zoom: 17 });
+        el.classList.remove('show');
+        document.getElementById('search-input').value = '';
+      });
+      el.appendChild(div);
+    });
   }, []);
 
   const handleMapClick = useCallback((e) => {
