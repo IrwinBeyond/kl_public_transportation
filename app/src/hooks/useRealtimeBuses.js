@@ -43,17 +43,21 @@ export default function useRealtimeBuses(enabled) {
 
   useEffect(() => {
     if (!enabled) {
-      setStatus('idle');
-      setBusCount(0);
-      setData({ type: 'FeatureCollection', features: [] });
       clearInterval(timerRef.current);
       return;
     }
 
-    fetchData();
+    const initTimer = setTimeout(fetchData, 0);
     timerRef.current = setInterval(fetchData, POLL_INTERVAL);
-    return () => clearInterval(timerRef.current);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(timerRef.current);
+    };
   }, [enabled, fetchData]);
+
+  if (!enabled) {
+    return { data: { type: 'FeatureCollection', features: [] }, status: 'idle', busCount: 0, lastUpdate: null, refetch: fetchData };
+  }
 
   return { data, status, busCount, lastUpdate, refetch: fetchData };
 }

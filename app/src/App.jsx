@@ -86,20 +86,6 @@ function App() {
     });
   }, []);
 
-  const handleLocate = useCallback(() => {
-    if (!navigator.geolocation) return;
-    const map = mapInstanceRef.current;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        map?.flyTo({ center: [longitude, latitude], zoom: 14 });
-        setTimeout(() => findNearbyStops(map, latitude, longitude), 1500);
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, []);
-
   function findNearbyStops(map, lat, lng) {
     if (!map) return;
     const features = map.querySourceFeatures('stops', { sourceLayer: 'transit_stops' });
@@ -113,6 +99,20 @@ function App() {
       .slice(0, 5);
     setNearbyStops(stops);
   }
+
+  const handleLocate = useCallback(() => {
+    if (!navigator.geolocation) return;
+    const map = mapInstanceRef.current;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        map?.flyTo({ center: [longitude, latitude], zoom: 14 });
+        setTimeout(() => findNearbyStops(map, latitude, longitude), 1500);
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
 
   const handleNearbyStopClick = useCallback((stop) => {
     mapInstanceRef.current?.flyTo({ center: [stop.lon, stop.lat], zoom: 17 });
