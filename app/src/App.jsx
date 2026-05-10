@@ -237,8 +237,8 @@ function App() {
           interactiveLayerIds={INTERACTIVE_LAYERS}
           onClick={handleMapClick}
         >
-          <Source id="routes" type="vector" tiles={['http://yuellen.my.id/martin/transit_routes/{z}/{x}/{y}']} minzoom={6} maxzoom={20} />
-          <Source id="stops" type="vector" tiles={['http://yuellen.my.id/martin/transit_stops/{z}/{x}/{y}']} minzoom={8} maxzoom={20} />
+          <Source id="routes" type="vector" tiles={['https://yuellen.my.id/martin/transit_routes/{z}/{x}/{y}']} minzoom={6} maxzoom={20} />
+          <Source id="stops" type="vector" tiles={['https://yuellen.my.id/martin/transit_stops/{z}/{x}/{y}']} minzoom={8} maxzoom={20} />
 
           <Source id="bus-realtime" type="geojson" data={busData}>
             <Layer

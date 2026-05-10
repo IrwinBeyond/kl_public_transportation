@@ -14,22 +14,29 @@ message FeedHeader {
 }
 message FeedEntity {
   required string id = 1;
-  optional VehiclePosition vehicle = 8;
+  optional bool is_deleted = 2;
+  optional TripUpdate trip_update = 3;
+  optional VehiclePosition vehicle = 4;
+  optional Alert alert = 5;
 }
+message TripUpdate {
+  optional TripDescriptor trip = 1;
+}
+message Alert {}
 message VehiclePosition {
   optional TripDescriptor trip = 1;
-  optional VehicleDescriptor vehicle = 3;
-  optional Position position = 4;
-  optional uint32 current_stop_sequence = 5;
-  optional uint64 timestamp = 8;
-  optional float bearing = 14;
+  optional Position position = 2;
+  optional uint32 current_stop_sequence = 3;
+  optional uint64 timestamp = 5;
+  optional string stop_id = 7;
+  optional VehicleDescriptor vehicle = 8;
 }
 message TripDescriptor {
   optional string trip_id = 1;
-  optional string route_id = 2;
-  optional uint32 direction_id = 3;
-  optional string start_time = 4;
-  optional string start_date = 5;
+  optional string start_time = 2;
+  optional string start_date = 3;
+  optional string route_id = 5;
+  optional uint32 direction_id = 6;
 }
 message VehicleDescriptor {
   optional string id = 1;
@@ -39,8 +46,8 @@ message VehicleDescriptor {
 message Position {
   required float latitude = 1;
   required float longitude = 2;
-  optional float bearing = 5;
-  optional float speed = 4;
+  optional float bearing = 3;
+  optional float speed = 5;
 }
 `;
 
