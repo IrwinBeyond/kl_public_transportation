@@ -1,4 +1,5 @@
 import { memo, useState, useRef } from 'react';
+import { AGENCY_COLORS, STATION_COLOR, legendColor } from '../constants/colors';
 
 const SECTIONS = [
   {
@@ -32,8 +33,8 @@ function Sidebar({
   onToggle,
   onSearch,
   onLocate,
-  status,
-  busCount,
+  feeds,
+  realtimeStatus,
   lastUpdate,
   nearbyStops,
   onNearbyStopClick,
@@ -79,7 +80,7 @@ function Sidebar({
   const getAgencyColors = (agency) => {
     const agencyRoutes = routes.filter(r => r.agency === agency);
     if (agencyRoutes.length === 0) return null;
-    return [...new Set(agencyRoutes.map(r => r.color))];
+    return [...new Set(agencyRoutes.map(r => legendColor({ agency, shortName: r.shortName, routeColor: r.color })))];
   };
 
   return (
@@ -111,14 +112,19 @@ function Sidebar({
 
       <div id="sidebar-body">
         <div id="search-wrap">
-          <span className="search-icon">&#9740;</span>
+          <span className="search-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </span>
           <input id="search-input" type="text" placeholder="Search stops or routes..." autoComplete="off"
             onChange={(e) => onSearch(e.target.value)}
           />
           <div id="search-results"></div>
         </div>
 
-        <StatusBar status={status} busCount={busCount} lastUpdate={lastUpdate} />
+        <StatusBar feeds={feeds} status={realtimeStatus} lastUpdate={lastUpdate} />
 
         <div id="layer-toggles">
           {SECTIONS.map((section, i) => (
@@ -130,7 +136,8 @@ function Sidebar({
                 const agencyColors = item.type === 'line' ? getAgencyColors(item.agency) : null;
                 const swatchStyle = agencyColors && agencyColors.length > 0
                   ? { background: agencyColors.length === 1 ? agencyColors[0] : `linear-gradient(90deg, ${agencyColors.slice(0, 5).join(', ')})` }
-                  : { background: item.swatch || (item.agency === 'rapid-rail' ? '#e57200' : '#115740') };
+                  : { background: AGENCY_COLORS[item.agency] || STATION_COLOR };
+                const isRealtime = item.id.startsWith('realtime');
 
                 return (
                   <label className={`layer-toggle${highlightedRoute === item.id ? ' highlighted' : ''}`} key={item.id}>
@@ -138,7 +145,7 @@ function Sidebar({
                       type="checkbox"
                       id={item.toggleId}
                       defaultChecked={item.checked}
-                      onChange={(e) => onToggle(item.id, item.id.startsWith('realtime'), e.target.checked)}
+                      onChange={(e) => onToggle(item.id, isRealtime, e.target.checked)}
                     />
                     <span className="toggle-track" />
                     <span className="toggle-label" onClick={(e) => {
@@ -150,6 +157,7 @@ function Sidebar({
                       <span className={`swatch${item.type === 'dot' ? ' dot' : ''}`} style={swatchStyle} />
                       {item.label}
                     </span>
+                    {isRealtime && <LiveCount feed={(feeds || []).find(f => f.agency === item.agency)} />}
                   </label>
                 );
               })}
@@ -163,21 +171,38 @@ function Sidebar({
   );
 }
 
-function StatusBar({ status, busCount, lastUpdate }) {
-  const labels = {
-    idle: 'Real-time: paused',
-    live: 'Live: active',
-    empty: 'Live: no vehicles right now',
-    offline: 'Real-time unavailable',
-  };
-  const dotClass = (status === 'live' || status === 'online') ? 'online' : status === 'empty' ? 'warning' : status === 'offline' ? '' : 'warning';
-  const timeStr = lastUpdate instanceof Date ? lastUpdate.toLocaleTimeString() : lastUpdate || '';
+// Compact per-agency live count shown next to each realtime toggle.
+function LiveCount({ feed }) {
+  let text = '—';      // not yet loaded / no status
+  let cls = 'live-count';
+  if (feed) {
+    if (!feed.ok) { text = 'offline'; cls += ' offline'; }
+    else if (feed.vehicles > 0) { text = `${feed.vehicles} live`; cls += ' active'; }
+    else { text = 'none'; cls += ' none'; }
+  }
+  return <span className={cls}>{text}</span>;
+}
+
+// Summary of live realtime data: total vehicles across feeds + last update time.
+function StatusBar({ feeds, status, lastUpdate }) {
+  const list = feeds || [];
+  const anyOk = list.some(f => f.ok);
+  const total = list.reduce((s, f) => s + (f.ok ? (f.vehicles || 0) : 0), 0);
+  const loading = status === 'idle' && list.length === 0;
+
+  let text;
+  let dotClass;
+  if (loading) { text = 'Connecting to live data…'; dotClass = 'warning'; }
+  else if (!anyOk) { text = 'Realtime unavailable'; dotClass = ''; }
+  else if (total > 0) { text = `${total} live vehicle${total !== 1 ? 's' : ''}`; dotClass = 'online'; }
+  else { text = 'No live vehicles right now'; dotClass = 'warning'; }
+
+  const timeStr = lastUpdate instanceof Date ? lastUpdate.toLocaleTimeString() : (lastUpdate || '');
   return (
     <div id="status-bar">
       <div className={`status-dot ${dotClass}`} />
-      <span id="status-text">{labels[status] || labels.idle}</span>
-      {busCount > 0 && <span id="bus-count">{busCount} vehicle{busCount !== 1 ? 's' : ''}</span>}
-      {timeStr && <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{timeStr}</span>}
+      <span id="status-text">{text}</span>
+      {timeStr && <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>updated {timeStr}</span>}
     </div>
   );
 }

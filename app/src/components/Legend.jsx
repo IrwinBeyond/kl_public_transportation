@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { AGENCY_LABELS } from '../constants/transit';
+import { legendColor, AGENCY_COLORS, STATION_COLOR } from '../constants/colors';
 
 function Legend({ routeMetadata, visibility }) {
   const { routes } = routeMetadata || { routes: [] };
@@ -22,13 +23,13 @@ function Legend({ routeMetadata, visibility }) {
       <div id="legend">
         {showRail && (
           <div className="legend-row">
-            <span className="legend-line" style={{ background: '#e57200' }} />
+            <span className="legend-line" style={{ background: AGENCY_COLORS['rapid-rail'] }} />
             Rail Transit
           </div>
         )}
         {showBus && (
           <div className="legend-row">
-            <span className="legend-line" style={{ background: '#115740' }} />
+            <span className="legend-line" style={{ background: AGENCY_COLORS['rapid-bus'] }} />
             Bus Routes
           </div>
         )}
@@ -45,15 +46,19 @@ function Legend({ routeMetadata, visibility }) {
     }
 
     if (!acc[r.agency]) acc[r.agency] = [];
-    
-    const existing = acc[r.agency].find(item => item && item.color === r.color);
+
+    // Swatch color comes from the shared palette so the legend matches the map
+    // (rail per line, bus per GTFS sub-group, feeder/ktmb one identity color).
+    const color = legendColor({ agency: r.agency, shortName: r.shortName, routeColor: r.color });
+
+    const existing = acc[r.agency].find(item => item && item.color === color);
     if (existing) {
       if (r.shortName && !existing.names.includes(r.shortName)) {
         existing.names.push(r.shortName);
       }
     } else {
       acc[r.agency].push({
-        color: r.color || '#888888',
+        color,
         names: [r.shortName || '?'],
         longName: r.longName || ''
       });
@@ -90,7 +95,7 @@ function Legend({ routeMetadata, visibility }) {
       {showStations && (
         <div className="legend-fixed-footer">
            <div className="legend-row">
-              <span className="legend-dot" style={{ background: '#D50032' }} />
+              <span className="legend-dot" style={{ background: STATION_COLOR }} />
               Stations
            </div>
         </div>

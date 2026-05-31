@@ -1,7 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { REALTIME_URL } from '../constants/config';
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
+
+// Adds a persistent heading to each vehicle: a stopped vehicle (bearing 0) keeps
+// pointing in its last-known direction instead of losing its arrow. Runs in the
+// fetch callback (not during render), so the ref access is safe.
+function withHeadings(json, lastBearing) {
+  if (!json || !json.features) return EMPTY;
+  const features = json.features.map((f) => {
+    const p = f.properties || {};
+    const b = Number(p.bearing) || 0;
+    if (b !== 0 && p.vehicle_id) lastBearing[p.vehicle_id] = b;
+    const dirBearing = b !== 0 ? b : (lastBearing[p.vehicle_id] || 0);
+    return { ...f, properties: { ...p, dirBearing, hasHeading: dirBearing !== 0 } };
+  });
+  return { type: 'FeatureCollection', features };
+}
 
 // Fetches the whole live fleet (GeoJSON) plus per-feed status from the fetcher's
 // /realtime.geojson endpoint. Refetched whenever `refreshKey` changes (the map
@@ -11,6 +26,8 @@ export function useRealtime(refreshKey) {
   const [data, setData] = useState(EMPTY);
   const [feeds, setFeeds] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | ok | error
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const lastBearingRef = useRef({});
 
   useEffect(() => {
     let cancelled = false;
@@ -18,9 +35,10 @@ export function useRealtime(refreshKey) {
       .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then((json) => {
         if (cancelled) return;
-        setData(json && json.features ? json : EMPTY);
+        setData(withHeadings(json, lastBearingRef.current));
         setFeeds(Array.isArray(json?.feeds) ? json.feeds : []);
         setStatus('ok');
+        setLastUpdate(new Date());
       })
       .catch((err) => {
         if (cancelled) return;
@@ -30,5 +48,5 @@ export function useRealtime(refreshKey) {
     return () => { cancelled = true; };
   }, [refreshKey]);
 
-  return { data, feeds, status };
+  return { data, feeds, status, lastUpdate };
 }

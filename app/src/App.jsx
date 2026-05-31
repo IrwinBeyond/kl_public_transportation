@@ -10,6 +10,7 @@ import { useRouteMetadata } from './hooks/useRouteMetadata';
 import { useRealtime } from './hooks/useRealtime';
 import { LAYER_DEFS, INTERACTIVE_LAYERS, ASSET_MAP, AGENCY_LABELS } from './constants/transit';
 import { MARTIN_URL } from './constants/config';
+import { AGENCY_COLORS, isLight, legendColor } from './constants/colors';
 
 // Maps a realtime layer toggle id to its feed agency_name (for empty-feed toasts).
 const REALTIME_TOGGLE_AGENCY = {
@@ -17,12 +18,35 @@ const REALTIME_TOGGLE_AGENCY = {
   'realtime-rapid-bus': 'rapid-bus',
   'realtime-mrt-feeder': 'rapid-mrt',
 };
+
+// Draws an upward-pointing arrow on a canvas and returns ImageData for map.addImage.
+// Rendered at 2x (registered with pixelRatio: 2) for crisp edges.
+function makeArrowIcon(fill, outline) {
+  const size = 44;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const c = size / 2;
+  ctx.translate(c, c);
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.40);          // tip (north)
+  ctx.lineTo(size * 0.30, size * 0.36); // bottom-right
+  ctx.lineTo(0, size * 0.12);           // tail notch
+  ctx.lineTo(-size * 0.30, size * 0.36);// bottom-left
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = size * 0.07;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+  return ctx.getImageData(0, 0, size, size);
+}
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './App.css';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('transit-theme') === 'dark');
-  const [realtimeEnabled, setRealtimeEnabled] = useState(false);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [nearbyStops, setNearbyStops] = useState(null);
@@ -43,13 +67,36 @@ function App() {
   const routeMetadata = useRouteMetadata(mapLoaded ? mapInstanceRef.current : null);
 
   // Live fleet GeoJSON + per-feed status (for empty/unavailable detection).
-  const { data: realtimeData, feeds: realtimeFeeds } = useRealtime(refreshKey);
+  const { data: realtimeData, feeds: realtimeFeeds, status: realtimeStatus, lastUpdate: realtimeLastUpdate } = useRealtime(refreshKey);
   const feedsRef = useRef([]);
   useEffect(() => { feedsRef.current = realtimeFeeds; }, [realtimeFeeds]);
   const [toast, setToast] = useState(null);
 
+  // route_short_name -> palette color, so live vehicles can follow their route's color.
+  const routeColorMap = useMemo(() => {
+    const m = {};
+    (routeMetadata?.routes || []).forEach((r) => {
+      if (r.agency && r.shortName) {
+        m[`${r.agency}:${r.shortName}`] = legendColor({ agency: r.agency, shortName: r.shortName, routeColor: r.color });
+      }
+    });
+    return m;
+  }, [routeMetadata]);
+
+  // Color each live vehicle by its route (falls back to agency color). Headings
+  // (dirBearing/hasHeading) are already set in useRealtime. arrowIcon names a
+  // per-color icon generated on demand in handleMapLoad.
+  const enrichedRealtime = useMemo(() => {
+    const features = (realtimeData?.features || []).map((f) => {
+      const p = f.properties || {};
+      const agency = p.agency_name;
+      const color = routeColorMap[`${agency}:${p.route_id}`] || AGENCY_COLORS[agency] || '#37474F';
+      return { ...f, properties: { ...p, color, arrowIcon: `arrow_${color.replace('#', '')}` } };
+    });
+    return { type: 'FeatureCollection', features };
+  }, [realtimeData, routeColorMap]);
+
   const toggleLayer = useCallback((layerId, isRealtime, checked) => {
-    if (isRealtime) setRealtimeEnabled(checked);
     setVisibility(prev => ({ ...prev, [layerId]: checked }));
 
     // When a realtime layer is switched ON, warn if its upstream feed is empty/unavailable.
@@ -187,7 +234,7 @@ function App() {
     const map = e.target;
     mapInstanceRef.current = map;
     setMapLoaded(true);
-    
+
     ASSET_MAP.forEach(async (asset) => {
       try {
         const image = await map.loadImage(asset.path);
@@ -196,6 +243,21 @@ function App() {
         }
       } catch (err) {
         console.warn(`Failed to load asset: ${asset.id}`, err);
+      }
+    });
+
+    // Directional arrow icons are generated on demand, one per route color, so
+    // each live vehicle's arrow matches its route. Features request `arrow_<hex>`;
+    // we draw it the first time it's missing (drawn pointing up so icon-rotate
+    // aligns with north). Robust across HMR — no pre-registration needed.
+    map.on('styleimagemissing', (e) => {
+      const id = e.id;
+      if (!id || !id.startsWith('arrow_') || map.hasImage(id)) return;
+      const hex = `#${id.slice('arrow_'.length)}`;
+      try {
+        map.addImage(id, makeArrowIcon(hex, isLight(hex) ? '#333333' : '#ffffff'), { pixelRatio: 2 });
+      } catch (err) {
+        console.warn(`Failed to generate arrow icon: ${id}`, err);
       }
     });
   }, []);
@@ -244,9 +306,9 @@ function App() {
         onToggle={toggleLayer}
         onSearch={handleSearch}
         onLocate={handleLocate}
-        status={realtimeEnabled ? 'live' : 'idle'}
-        busCount={0} // This was from useRealtimeBuses, setting to 0 or removing if not used
-        lastUpdate={new Date().toLocaleTimeString()}
+        feeds={realtimeFeeds}
+        realtimeStatus={realtimeStatus}
+        lastUpdate={realtimeLastUpdate}
         nearbyStops={nearbyStops}
         onNearbyStopClick={(stop) => mapInstanceRef.current?.flyTo({ center: [stop.lon, stop.lat], zoom: 17 })}
         darkMode={darkMode}
@@ -268,7 +330,9 @@ function App() {
           maxBounds={[[98.5, 0.5], [120, 7.5]]}
           interactiveLayerIds={[
             ...INTERACTIVE_LAYERS,
-            'realtime-ktmb', 'realtime-rapid-bus', 'realtime-mrt-feeder'
+            'realtime-ktmb', 'realtime-ktmb-arrow',
+            'realtime-rapid-bus', 'realtime-rapid-bus-arrow',
+            'realtime-mrt-feeder', 'realtime-mrt-feeder-arrow'
           ]}
           onClick={handleMapClick}
         >
@@ -276,7 +340,7 @@ function App() {
           <Source id="stops" type="vector" tiles={[`${MARTIN_URL}/transit_stops/{z}/{x}/{y}`]} minzoom={8} maxzoom={20} />
           
           {layerComponents}
-          <RealtimeLayers visibility={visibility} data={realtimeData} />
+          <RealtimeLayers visibility={visibility} data={enrichedRealtime} />
 
           {popupInfo && (
             <Popup longitude={popupInfo.lngLat.lng} latitude={popupInfo.lngLat.lat} onClose={() => setPopupInfo(null)} anchor="top">
