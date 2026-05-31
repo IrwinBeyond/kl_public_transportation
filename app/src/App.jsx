@@ -7,6 +7,7 @@ import { ServiceAlerts } from './components/ServiceAlerts';
 import { RealtimeLayers } from './components/Map/RealtimeLayers';
 import { useRouteMetadata } from './hooks/useRouteMetadata';
 import { LAYER_DEFS, INTERACTIVE_LAYERS, ASSET_MAP, AGENCY_LABELS } from './constants/transit';
+import { MARTIN_URL } from './constants/config';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './App.css';
 
@@ -146,7 +147,7 @@ function App() {
     // 2. Fetch Service Alerts (every 60s)
     const fetchAlerts = async () => {
       try {
-        const res = await fetch(`https://yuellen.my.id/martin/service_alerts/0/0/0?t=${Date.now()}`);
+        const res = await fetch(`${MARTIN_URL}/service_alerts/0/0/0?t=${Date.now()}`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.features) setAlerts(data.features.map(f => f.properties));
@@ -254,8 +255,8 @@ function App() {
           ]}
           onClick={handleMapClick}
         >
-          <Source id="routes" type="vector" tiles={['https://yuellen.my.id/martin/transit_routes/{z}/{x}/{y}']} minzoom={6} maxzoom={20} />
-          <Source id="stops" type="vector" tiles={['https://yuellen.my.id/martin/transit_stops/{z}/{x}/{y}']} minzoom={8} maxzoom={20} />
+          <Source id="routes" type="vector" tiles={[`${MARTIN_URL}/transit_routes/{z}/{x}/{y}`]} minzoom={6} maxzoom={20} />
+          <Source id="stops" type="vector" tiles={[`${MARTIN_URL}/transit_stops/{z}/{x}/{y}`]} minzoom={8} maxzoom={20} />
           
           {layerComponents}
           <RealtimeLayers visibility={visibility} refreshKey={refreshKey} />

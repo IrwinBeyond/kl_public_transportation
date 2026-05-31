@@ -1,12 +1,13 @@
 import { Source, Layer } from 'react-map-gl/maplibre';
 import { useState, useEffect } from 'react';
+import { MARTIN_URL } from '../../constants/config';
 
 export function RealtimeLayers({ visibility, refreshKey }) {
   // Use double buffering (Source A and Source B) to prevent flickering
   const [activeBuffer, setActiveBuffer] = useState('A');
   const [bufferUrls, setBufferUrls] = useState({
-    A: `https://yuellen.my.id/martin/realtime_vehicles_with_stops/{z}/{x}/{y}?t=${Date.now()}`,
-    B: `https://yuellen.my.id/martin/realtime_vehicles_with_stops/{z}/{x}/{y}?t=${Date.now()}`
+    A: `${MARTIN_URL}/realtime_vehicles_with_stops/{z}/{x}/{y}?t=${Date.now()}`,
+    B: `${MARTIN_URL}/realtime_vehicles_with_stops/{z}/{x}/{y}?t=${Date.now()}`
   });
 
   useEffect(() => {
@@ -14,7 +15,7 @@ export function RealtimeLayers({ visibility, refreshKey }) {
     const nextBuffer = activeBuffer === 'A' ? 'B' : 'A';
     setBufferUrls(prev => ({
       ...prev,
-      [nextBuffer]: `https://yuellen.my.id/martin/realtime_vehicles_with_stops/{z}/{x}/{y}?t=${refreshKey}`
+      [nextBuffer]: `${MARTIN_URL}/realtime_vehicles_with_stops/{z}/{x}/{y}?t=${refreshKey}`
     }));
 
     // Wait a short moment for the new tiles to start loading, then swap
