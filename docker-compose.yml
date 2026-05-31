@@ -36,6 +36,11 @@ services:
       - ./martin/martin.yaml:/etc/martin/config.yaml:ro
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      # Optional. When set (dev uses 0), Martin's in-memory tile cache is sized
+      # accordingly; 0 disables it. Martin caches table-source tiles by z/x/y and
+      # ignores query params, which freezes the realtime layer. Unset (prod) =>
+      # no flag passed => Martin's default behavior is untouched.
+      - MARTIN_CACHE_SIZE=${MARTIN_CACHE_SIZE:-}
     depends_on:
       db:
         condition: service_healthy
@@ -44,7 +49,9 @@ services:
     command:
       - |
         envsubst '$$DATABASE_URL' < /etc/martin/config.yaml > /tmp/martin.yaml
-        exec /usr/local/bin/martin --config /tmp/martin.yaml --webui enable-for-all
+        CACHE_FLAG=""
+        [ -n "$$MARTIN_CACHE_SIZE" ] && CACHE_FLAG="--cache-size $$MARTIN_CACHE_SIZE"
+        exec /usr/local/bin/martin --config /tmp/martin.yaml $$CACHE_FLAG --webui enable-for-all
     stop_grace_period: 10s
 
   web:
