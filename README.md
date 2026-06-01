@@ -255,7 +255,7 @@ Update the relevant link in the chain, then refresh the materialized views.
 
 ## License
 
-This project is open source. See the [LICENSE](LICENSE) file for details.
+Licensed under the [MIT License](LICENSE).
 
 ---
 
