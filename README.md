@@ -255,7 +255,7 @@ Update the relevant link in the chain, then refresh the materialized views.
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+Licensed under the [GNU General Public License v3.0](LICENSE).
 
 ---
 
